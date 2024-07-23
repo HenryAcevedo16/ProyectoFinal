@@ -69,6 +69,10 @@ class CartManager {
             console.error("Error guardando el archivo de carritos", error);
         }
     }
+
+    async getAllCarts() {
+        return await this.readCartsFile();
+    }
 }
 
 module.exports = CartManager;

@@ -116,10 +116,36 @@ app.delete("/products/:pid", async (req, res) => {
     }
 });
 
+cartRouter.get("/", async (req, res) => {
+    try {
+        const carts = await cartManager.getAllCarts();
+        res.status(200).send(carts);
+    } catch (error) {
+        res.status(500).send({ message: "Error al obtener los carritos", error: error.message });
+    }
+});
+
+// Endpoint para agregar un producto al carrito
+cartRouter.post("/:cid/products", async (req, res) => {
+    const { cid } = req.params; 
+    const { pid, quantity } = req.body;
+
+    try {
+        const added = await cartManager.addProductToCart(cid, pid, quantity);
+        if (added) {
+            res.status(200).send({ message: "Producto agregado al carrito con éxito" });
+        } else {
+            res.status(404).send({ message: "Producto o carrito no encontrado" });
+        }
+    } catch (error) {
+        res.status(500).send({ message: "Error al agregar el producto al carrito", error: error.message });
+    }
+});
+
 // Endpoint para actualizar la cantidad de un producto en el carrito
 cartRouter.put("/:cid/products/:pid", async (req, res) => {
     const { cid, pid } = req.params;
-    const { quantity } = req.body; // Asumiendo que se envía la nueva cantidad en el cuerpo de la solicitud
+    const { quantity } = req.body;
 
     try {
         const updated = await cartManager.updateProductInCart(cid, pid, quantity);
