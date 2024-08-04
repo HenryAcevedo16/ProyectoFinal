@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Productos en Tiempo Real</title>
+</head>
+<body>
+    <h1>Productos en Tiempo Real</h1>
+    <ul id="lista-productos">
+        {{#each productos}}
+            <li>{{this.title}} - {{this.description}}</li>
+        {{/each}}
+    </ul>
+
+    <form id="form-nuevo-producto">
+        <input type="text" id="nombre-producto" placeholder="Nombre del producto">
+        <input type="text" id="descripcion-producto" placeholder="Descripción del producto">
+        <button type="submit">Agregar Producto</button>
+    </form>
+
+    <form id="form-eliminar-producto">
+        <input type="number" id="id-producto-eliminar" placeholder="ID del producto a eliminar">
+        <button type="submit">Eliminar Producto</button>
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const listaProductos = document.getElementById('lista-productos');
+        const formNuevoProducto = document.getElementById('form-nuevo-producto');
+        const formEliminarProducto = document.getElementById('form-eliminar-producto');
+
+        formNuevoProducto.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('nombre-producto').value;
+            const description = document.getElementById('descripcion-producto').value;
+            socket.emit('nuevoProducto', { title, description });
+            document.getElementById('nombre-producto').value = '';
+            document.getElementById('descripcion-producto').value = '';
+        });
+
+        formEliminarProducto.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('id-producto-eliminar').value);
+            socket.emit('eliminarProducto', { id });
+            document.getElementById('id-producto-eliminar').value = '';
+        });
+
+        socket.on('productoNuevo', (producto) => {
+            const li = document.createElement('li');
+            li.textContent = `${producto.title} - ${producto.description}`;
+            listaProductos.appendChild(li);
+        });
+
+        socket.on('productoEliminado', (producto) => {
+            const items = listaProductos.getElementsByTagName('li');
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].textContent.includes(producto.title)) {
+                    listaProductos.removeChild(items[i]);
+                    break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

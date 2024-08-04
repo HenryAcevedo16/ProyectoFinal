@@ -1,8 +1,23 @@
 const express = require("express");
-const app = express();
-const PUERTO = 8080;
+const { createServer } = require("http");
+const { Server } = require("socket.io");
+const exphbs = require("express-handlebars");
+const path = require("path");
 
+const app = express();
+const server = createServer(app);
+const io = new Server(server);
+
+// Configuración de Handlebars
+const hbs = exphbs.create({ /* config */ });
+app.engine('handlebars', hbs.engine);
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'views'));
+
+// Middleware para servir archivos estáticos
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Importamos El Product Manager
 const ProductManager = require("./controller/productManager.js")
@@ -12,19 +27,27 @@ const manager = new ProductManager("./src/data/productos.json")
 const CartManager = require("./controller/cartManager.js")
 const cartManager = new CartManager("./src/data/carts.json")
 
-// Rutas para productos
-app.get("/", (req, res) => {
-    res.send("Bienvenidos al servidor Express");
-})
+let productos = [];
 
+// Rutas para vistas con Handlebars
+app.get("/", async (req, res) => {
+    const arrayProductos = await manager.getProducts();
+    res.render('home', { productos: arrayProductos });
+});
+
+app.get("/realtimeproducts", async (req, res) => {
+    const arrayProductos = await manager.getProducts();
+    res.render('realTimeProducts', { productos: arrayProductos });
+});
+
+// Rutas para productos
 app.get("/products", async (req, res) => {
     const arrayProductos = await manager.getProducts();
     res.send(arrayProductos);
-})
+});
 
 app.get("/products/:pid", async (req, res) => {
     let id = req.params.pid;
-
     const producto = await manager.getProductById(parseInt(id));
 
     if (!producto) {
@@ -32,17 +55,17 @@ app.get("/products/:pid", async (req, res) => {
     } else {
         res.send({ producto });
     }
-})
+});
 
 app.post("/products", async (req, res) => {
     try {
         const newProduct = await manager.addProduct(req.body);
-
+        io.emit('productoNuevo', newProduct);
         res.status(201).send({ message: "Producto añadido con éxito", product: newProduct });
     } catch (error) {
         res.status(500).send({ message: "Error al añadir el producto", error: error.message });
     }
-})
+});
 
 // Rutas para el carrito
 const cartRouter = express.Router();
@@ -62,7 +85,7 @@ cartRouter.post("/:cid/products", async (req, res) => {
     } catch (error) {
         res.status(500).send({ message: "Error al añadir el producto al carrito", error: error.message });
     }
-})
+});
 
 cartRouter.delete("/:cid/products/:pid", async (req, res) => {
     const { cid, pid } = req.params;
@@ -73,7 +96,7 @@ cartRouter.delete("/:cid/products/:pid", async (req, res) => {
     } catch (error) {
         res.status(500).send({ message: "Error al eliminar el producto del carrito", error: error.message });
     }
-})
+});
 
 cartRouter.get("/:cid", async (req, res) => {
     const { cid } = req.params;
@@ -88,7 +111,7 @@ cartRouter.get("/:cid", async (req, res) => {
     } catch (error) {
         res.status(500).send({ message: "Error al obtener el carrito", error: error.message });
     }
-})
+});
 
 app.use("/api/carts", cartRouter);
 
@@ -112,72 +135,28 @@ app.delete("/products/:pid", async (req, res) => {
     if (!success) {
         res.status(404).send({ message: "Producto no encontrado" });
     } else {
+        io.emit('productoEliminado', { id });
         res.status(200).send({ message: "Producto eliminado con éxito" });
     }
 });
 
-cartRouter.get("/", async (req, res) => {
-    try {
-        const carts = await cartManager.getAllCarts();
-        res.status(200).send(carts);
-    } catch (error) {
-        res.status(500).send({ message: "Error al obtener los carritos", error: error.message });
-    }
+// Configuración de Socket.IO
+io.on('connection', (socket) => {
+    console.log('Un usuario se ha conectado');
+
+    socket.on('nuevoProducto', async (producto) => {
+        await manager.addProduct(producto.title, producto.description, producto.price, producto.img, producto.code, producto.stock, producto.thumbnails, producto.status, producto.category);
+        io.emit('productoNuevo', producto);
+    });
+
+    socket.on('eliminarProducto', async (producto) => {
+        await manager.deleteProduct(producto.id);
+        io.emit('productoEliminado', producto);
+    });
 });
-
-// Endpoint para agregar un producto al carrito
-cartRouter.post("/:cid/products", async (req, res) => {
-    const { cid } = req.params; 
-    const { pid, quantity } = req.body;
-
-    try {
-        const added = await cartManager.addProductToCart(cid, pid, quantity);
-        if (added) {
-            res.status(200).send({ message: "Producto agregado al carrito con éxito" });
-        } else {
-            res.status(404).send({ message: "Producto o carrito no encontrado" });
-        }
-    } catch (error) {
-        res.status(500).send({ message: "Error al agregar el producto al carrito", error: error.message });
-    }
-});
-
-// Endpoint para actualizar la cantidad de un producto en el carrito
-cartRouter.put("/:cid/products/:pid", async (req, res) => {
-    const { cid, pid } = req.params;
-    const { quantity } = req.body;
-
-    try {
-        const updated = await cartManager.updateProductInCart(cid, pid, quantity);
-        if (updated) {
-            res.status(200).send({ message: "Producto actualizado en el carrito con éxito" });
-        } else {
-            res.status(404).send({ message: "Producto o carrito no encontrado" });
-        }
-    } catch (error) {
-        res.status(500).send({ message: "Error al actualizar el producto en el carrito", error: error.message });
-    }
-});
-
-// Endpoint para eliminar un carrito
-cartRouter.delete("/:cid", async (req, res) => {
-    const { cid } = req.params;
-
-    try {
-        const success = await cartManager.deleteCart(cid);
-        if (success) {
-            res.status(200).send({ message: "Carrito eliminado con éxito" });
-        } else {
-            res.status(404).send({ message: "Carrito no encontrado" });
-        }
-    } catch (error) {
-        res.status(500).send({ message: "Error al eliminar el carrito", error: error.message });
-    }
-});
-
-
 
 // Listen
-app.listen(PUERTO, () => {
-    console.log(`Servidor express escuchando en el puerto ${PUERTO}`);
-})
+const PORT = 8080;
+server.listen(PORT, () => {
+    console.log(`Servidor express escuchando en el puerto ${PORT}`);
+});
