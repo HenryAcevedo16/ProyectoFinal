@@ -38,5 +38,13 @@
     "code": "RTX3060Ti-8G",
     "stock": 25,
     "id": 5
+  },
+  {
+    "id": 6,
+    "title": "rYZEN 5600X",
+    "description": "Los procesadores para computadoras de escritorio para gaming AMD Ryzen™ 5 5600X incluyen seis núcleos increíbles que están pensados para quienes simplemente desean jugar. ¡Obtén más información",
+    "price": 120,
+    "code": "AMD5600X",
+    "stock": 2
   }
 ]

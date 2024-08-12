@@ -1,114 +1,92 @@
-const fs = require("fs").promises;
+const fs = require('fs');
 
 class ProductManager {
-
-    static ultId = 0;
-
-    
     constructor(path) {
-        this.products = [];
         this.path = path;
     }
 
-    async addProduct(title, description, price, img, code, stock, thumbnails, status, category) {
-        //Y ese producto que recibo por parametro lo meto en el array: 
-        //Pero antes.. validar que cada campo este completo y que el code no se repita: 
-
-        //1) Validacion: verificamos que todos los campos esten completos
-
-        if (!title || !description || !price || !img || !code || !stock || !thumbnails || !category || status === undefined) {
-            console.log("Todos los campos son obligatorios");
-            return;
-        }
-
-        //2) Validacion: 
-
-        if (this.products.some(item => item.code === code)) {
-            console.log("El codigo debe ser unico.. o todos moriremos");
-            return;
-        }
-
-        //3) Crear el producto, pero que tenga el id autoincrementable. 
-        const nuevoProducto = {
-            id: ++ProductManager.ultId,
-            title,
-            description,
-            price,
-            img,
-            code,
-            stock,
-            status,
-            category,
-            thumbnails
-        }
-
-        //4) Metemos el producto al array. 
-        this.products.push(nuevoProducto);
-
-        //5) Lo guardamos en el archivo: 
-        await this.guardarArchivo(this.products);
-    }
-
     async getProducts() {
-        const arrayProductos = await this.leerArchivo();
-        return arrayProductos;
+        try {
+            const data = await fs.promises.readFile(this.path, 'utf-8');
+            return JSON.parse(data);
+        } catch (error) {
+            console.error("Error al leer los productos:", error);
+            return [];
+        }
     }
-
-    //Debe contar con un método “getProductById” el cual debe buscar en el arreglo el producto que coincida con el id
-    //En caso de no coincidir ningún id, mostrar en consola un error “Not found”
 
     async getProductById(id) {
-        
-        const arrayProductos = await this.leerArchivo();
-        const buscado = arrayProductos.find(item => item.id === id);
-
-        if (!buscado) {
-            return "Producto no encontrado"
-        } else {
-            return buscado;
+        try {
+            const products = await this.getProducts();
+            return products.find(product => product.id === id);
+        } catch (error) {
+            console.error("Error al obtener el producto por ID:", error);
         }
     }
 
-    async updateProduct(id, updatedProduct) {
-        const products = await this.leerArchivo();
-        const productIndex = products.findIndex(product => product.id === id);
+    async addProduct(product) {
+        try {
+            const products = await this.getProducts();
 
-        if (productIndex === -1) {
-            return null;
+            // Validar que todos los campos requeridos estén presentes
+            const requiredFields = ['title', 'description', 'price', 'code', 'stock'];
+            for (let field of requiredFields) {
+                if (!product[field]) {
+                    throw new Error(`El campo ${field} es obligatorio`);
+                }
+            }
+
+            // Generar un nuevo ID
+            const newId = products.length > 0 ? products[products.length - 1].id + 1 : 1;
+            const newProduct = { id: newId, ...product };
+            products.push(newProduct);
+
+            // Guardar los productos actualizados
+            await fs.promises.writeFile(this.path, JSON.stringify(products, null, 2));
+            return newProduct;
+        } catch (error) {
+            console.error("Error al añadir el producto:", error);
+            throw error;
         }
+    }
 
-        // Actualizar solo los campos proporcionados, excepto el id
-        products[productIndex] = { ...products[productIndex], ...updatedProduct, id: products[productIndex].id };
+    async updateProduct(id, updates) {
+        try {
+            const products = await this.getProducts();
+            const productIndex = products.findIndex(product => product.id === id);
 
-        await this.guardarArchivo(products);
-        return products[productIndex];
+            if (productIndex === -1) {
+                return null;
+            }
+
+            products[productIndex] = { ...products[productIndex], ...updates };
+            await fs.promises.writeFile(this.path, JSON.stringify(products, null, 2));
+
+            return products[productIndex];
+        } catch (error) {
+            console.error("Error al actualizar el producto:", error);
+            throw error;
+        }
     }
 
     async deleteProduct(id) {
-        const products = await this.leerArchivo();
-        const productIndex = products.findIndex(product => product.id === id);
+        try {
+            let products = await this.getProducts();
+            const initialLength = products.length;
 
-        if (productIndex === -1) {
-            return false;
+            products = products.filter(product => product.id !== id);
+
+            if (products.length === initialLength) {
+                return false;
+            }
+
+            await fs.promises.writeFile(this.path, JSON.stringify(products, null, 2));
+            return true;
+        } catch (error) {
+            console.error("Error al eliminar el producto:", error);
+            throw error;
         }
-
-        products.splice(productIndex, 1);
-        await this.guardarArchivo(products);
-        return true;
     }
-
-    //Métodos auxiliares: 
-    async leerArchivo() {
-        const respuesta = await fs.readFile(this.path, "utf-8");
-        const arrayProductos = JSON.parse(respuesta);
-        return arrayProductos;
-    }
-
-    async guardarArchivo(arrayProductos) {
-        await fs.writeFile(this.path, JSON.stringify(arrayProductos, null, 2));
-    }
-
-
 }
 
 module.exports = ProductManager;

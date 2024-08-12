@@ -3,64 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <title>Productos en Tiempo Real</title>
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
     <h1>Productos en Tiempo Real</h1>
-    <ul id="lista-productos">
+    <ul id="product-list">
         {{#each productos}}
-            <li>{{this.title}} - {{this.description}}</li>
+            <li>{{this.title}} - {{this.description}} - ${{this.price}} - Código: {{this.code}} - Stock: {{this.stock}}</li>
         {{/each}}
     </ul>
 
-    <form id="form-nuevo-producto">
-        <input type="text" id="nombre-producto" placeholder="Nombre del producto">
-        <input type="text" id="descripcion-producto" placeholder="Descripción del producto">
+    <form id="new-product-form">
+        <input type="text" name="title" placeholder="Título" required>
+        <input type="text" name="description" placeholder="Descripción" required>
+        <input type="number" name="price" placeholder="Precio" required>
+        <input type="text" name="code" placeholder="Código" required>
+        <input type="number" name="stock" placeholder="Stock" required>
         <button type="submit">Agregar Producto</button>
-    </form>
-
-    <form id="form-eliminar-producto">
-        <input type="number" id="id-producto-eliminar" placeholder="ID del producto a eliminar">
-        <button type="submit">Eliminar Producto</button>
     </form>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
 
-        const listaProductos = document.getElementById('lista-productos');
-        const formNuevoProducto = document.getElementById('form-nuevo-producto');
-        const formEliminarProducto = document.getElementById('form-eliminar-producto');
-
-        formNuevoProducto.addEventListener('submit', (e) => {
+        document.getElementById('new-product-form').addEventListener('submit', function (e) {
             e.preventDefault();
-            const title = document.getElementById('nombre-producto').value;
-            const description = document.getElementById('descripcion-producto').value;
-            socket.emit('nuevoProducto', { title, description });
-            document.getElementById('nombre-producto').value = '';
-            document.getElementById('descripcion-producto').value = '';
+
+            const newProduct = {
+                title: e.target.title.value,
+                description: e.target.description.value,
+                price: parseFloat(e.target.price.value),
+                code: e.target.code.value,
+                stock: parseInt(e.target.stock.value, 10)
+            };
+
+            socket.emit('nuevoProducto', newProduct);
         });
 
-        formEliminarProducto.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const id = parseInt(document.getElementById('id-producto-eliminar').value);
-            socket.emit('eliminarProducto', { id });
-            document.getElementById('id-producto-eliminar').value = '';
-        });
-
-        socket.on('productoNuevo', (producto) => {
-            const li = document.createElement('li');
-            li.textContent = `${producto.title} - ${producto.description}`;
-            listaProductos.appendChild(li);
-        });
-
-        socket.on('productoEliminado', (producto) => {
-            const items = listaProductos.getElementsByTagName('li');
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].textContent.includes(producto.title)) {
-                    listaProductos.removeChild(items[i]);
-                    break;
-                }
-            }
+        socket.on('productoNuevo', function (product) {
+            const productList = document.getElementById('product-list');
+            const newItem = document.createElement('li');
+            newItem.textContent = `${product.title} - ${product.description} - $${product.price} - Código: ${product.code} - Stock: ${product.stock}`;
+            productList.appendChild(newItem);
         });
     </script>
 </body>
