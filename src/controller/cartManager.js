@@ -1,88 +1,58 @@
-const fs = require('fs');
+const CartModel = require("../models/cartModel");
 
 class CartManager {
-    constructor(path) {
-        this.path = path;
-    }
-
     async createCart() {
         try {
-            const carts = await this.getCarts();
-            const newId = carts.length > 0 ? carts[carts.length - 1].id + 1 : 1;
-            const newCart = { id: newId, products: [] };
-            carts.push(newCart);
-
-            await fs.promises.writeFile(this.path, JSON.stringify(carts, null, 2));
-            return newId;
+            const newCart = new CartModel({ products: [] });
+            await newCart.save();
+            return newCart.id; // Retorna el ID del carrito creado
         } catch (error) {
             console.error("Error al crear el carrito:", error);
             throw error;
         }
     }
 
-    async getCarts() {
+    async getCartById(cartId) {
         try {
-            const data = await fs.promises.readFile(this.path, 'utf-8');
-            return JSON.parse(data);
-        } catch (error) {
-            console.error("Error al leer los carritos:", error);
-            return [];
-        }
-    }
-
-    async getCartById(id) {
-        try {
-            const carts = await this.getCarts();
-            return carts.find(cart => cart.id === id);
+            const cart = await CartModel.findById(cartId);
+            if (!cart) {
+                throw new Error("No existe un carrito con ese ID");
+            }
+            return cart;
         } catch (error) {
             console.error("Error al obtener el carrito por ID:", error);
+            throw error;
         }
     }
 
     async addProductToCart(cartId, productId, quantity = 1) {
         try {
-            const carts = await this.getCarts();
-            const cartIndex = carts.findIndex(cart => cart.id === parseInt(cartId));
+            const cart = await this.getCartById(cartId);
+            const productIndex = cart.products.findIndex(p => p.product.toString() === productId);
 
-            if (cartIndex === -1) {
-                throw new Error("Carrito no encontrado");
-            }
-
-            const productIndex = carts[cartIndex].products.findIndex(product => product.id === parseInt(productId));
-
-            if (productIndex === -1) {
-                carts[cartIndex].products.push({ id: parseInt(productId), quantity });
+            if (productIndex > -1) {
+                cart.products[productIndex].quantity += quantity;
             } else {
-                carts[cartIndex].products[productIndex].quantity += quantity;
+                cart.products.push({ product: productId, quantity });
             }
 
-            await fs.promises.writeFile(this.path, JSON.stringify(carts, null, 2));
+            await cart.save(); // Guarda los cambios en la base de datos
+            return cart;
         } catch (error) {
-            console.error("Error al añadir el producto al carrito:", error);
+            console.error("Error al añadir producto al carrito:", error);
             throw error;
         }
     }
 
     async removeProductFromCart(cartId, productId) {
         try {
-            const carts = await this.getCarts();
-            const cartIndex = carts.findIndex(cart => cart.id === parseInt(cartId));
+            const cart = await this.getCartById(cartId);
+            cart.products = cart.products.filter(p => p.product.toString() !== productId);
 
-            if (cartIndex === -1) {
-                throw new Error("Carrito no encontrado");
-            }
-
-            const productIndex = carts[cartIndex].products.findIndex(product => product.id === parseInt(productId));
-
-            if (productIndex === -1) {
-                throw new Error("Producto no encontrado en el carrito");
-            }
-
-            carts[cartIndex].products.splice(productIndex, 1);
-
-            await fs.promises.writeFile(this.path, JSON.stringify(carts, null, 2));
+            await cart.save();
+            return cart;
         } catch (error) {
-            console.error("Error al eliminar el producto del carrito:", error);
+            console.error("Error al eliminar producto del carrito:", error);
             throw error;
         }
     }
