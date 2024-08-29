@@ -14,7 +14,7 @@ class CartManager {
 
     async getCartById(cartId) {
         try {
-            const cart = await CartModel.findById(cartId);
+            const cart = await CartModel.findById(cartId).populate('products.product');
             if (!cart) {
                 throw new Error("No existe un carrito con ese ID");
             }
@@ -27,19 +27,23 @@ class CartManager {
 
     async addProductToCart(cartId, productId, quantity = 1) {
         try {
-            const cart = await this.getCartById(cartId);
-            const productIndex = cart.products.findIndex(p => p.product.toString() === productId);
-
-            if (productIndex > -1) {
-                cart.products[productIndex].quantity += quantity;
+            const cart = await CartModel.findById(cartId);
+            if (!cart) {
+                throw new Error("Carrito no encontrado");
+            }
+    
+            const existingProduct = cart.products.find(p => p.product.toString() === productId);
+    
+            if (existingProduct) {
+                existingProduct.quantity += quantity;
             } else {
                 cart.products.push({ product: productId, quantity });
             }
-
-            await cart.save(); // Guarda los cambios en la base de datos
+    
+            await cart.save();
             return cart;
         } catch (error) {
-            console.error("Error al añadir producto al carrito:", error);
+            console.error("Error al añadir el producto al carrito:", error);
             throw error;
         }
     }

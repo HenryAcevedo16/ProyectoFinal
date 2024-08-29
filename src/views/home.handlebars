@@ -1,13 +1,44 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Products</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Productos</title>
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-    <h1>Product List</h1>
+    <h1>Lista de Productos</h1>
     <ul>
         {{#each productos}}
-            <li>{{this.title}} - ${{this.price}}</li>
+            <li>
+                {{this.title}} - ${{this.price}}
+                <button onclick="agregarAlCarrito('{{this._id}}')">Agregar al carrito</button>
+            </li>
         {{/each}}
     </ul>
+
+    <script>
+        function agregarAlCarrito(productId) {
+            fetch('/api/carts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ productId, quantity: 1 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Producto agregado al carrito');
+                } else {
+                    alert('Error al agregar el producto al carrito');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al agregar el producto al carrito');
+            });
+        }
+    </script>
 </body>
 </html>
